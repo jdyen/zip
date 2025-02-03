@@ -21,6 +21,8 @@ transformed data {
   int<lower = 0> n_zero = num_zeros(y);
   int<lower = 0> n_nonzero = n - n_zero;
   int<lower = 1> y_nonzero[n_nonzero];
+  int<lower = 0> ones_zero[n_zero];
+  int<lower = 0> zeros_zero[n_zero];
   vector[n_zero] x_zero;
   vector[n_nonzero] x_nonzero;
   int i_nonzero = 0;
@@ -29,6 +31,8 @@ transformed data {
     if (y[i] == 0) {
       i_zero += 1;
       x_zero[i_zero] = x[i];   
+      ones_zero[i_zero] = 1;
+      zeros_zero[i_zero] = 0;
     } else {
       i_nonzero += 1;
       y_nonzero[i_nonzero] = y[i];
@@ -49,9 +53,10 @@ transformed parameters {
   vector[n_zero] lambda_zero;
   vector[n_nonzero] lambda_nonzero;
   
-  // set up a linear predictor on the rate (non-zero component)
-  lambda_nonzero = alpha + beta * x_nonzero;
+  // set up a linear predictor separately for zero and
+  //   non-zero values
   lambda_zero = alpha + beta * x_zero;
+  lambda_nonzero = alpha + beta * x_nonzero;
   
 }
 
@@ -63,11 +68,10 @@ model {
   beta ~ std_normal();
     
   // calculate a summed probability of zero and non-zero values together
-  target += n_zero *
-   log_sum_exp(
-     bernoulli_lpmf(1 | theta),
-     bernoulli_lpmf(0 | theta) + 
-       poisson_log_lpmf(0 | lambda_zero)
+  target += log_sum_exp(
+     bernoulli_lpmf(ones_zero | theta),
+     bernoulli_lpmf(zeros_zero | theta) + 
+       poisson_log_lpmf(zeros_zero | lambda_zero)
    );
    target += n_nonzero * bernoulli_lpmf(0 | theta);
    target += poisson_log_lpmf(y_nonzero | lambda_nonzero);
@@ -77,5 +81,5 @@ model {
 // add a transformed theta (which is probabliity of zero) to
 //   give a probability of non-zero value
 generated quantities {
-  real<lower=0, upper=1> p = 1 - theta;
+  real<lower=0, upper=1> p = 1. - theta;
 }

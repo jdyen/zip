@@ -17,6 +17,7 @@ birds <- read_csv("data/data.csv")
 
 # compile the Stan version of the model
 stan_mod <- stan_model("src/zip.stan")
+opt_mod <- stan_model("src/zip-opt.stan")
 
 # prepare a data object
 stan_data <- list(
@@ -28,11 +29,18 @@ stan_data <- list(
 # and sample from the model
 iter <- 2000
 warmup <- 1000
-draws <- sampling(
+draws_stan <- sampling(
     object = stan_mod,
     data = stan_data,
     iter = iter,
     warmup = warmup
+)
+draws_opt <- sampling(
+    object = opt_mod,
+    data = stan_data,
+    iter = iter,
+    warmup = warmup,
+    control = list(adapt_delta = 0.9, max_treedepth = 15)
 )
 
 # now fit a brms version
@@ -64,7 +72,8 @@ true_values <- tibble(
 )
 
 # extract model estimates
-estimates_stan <- summarise_stan(draws)
+estimates_stan <- summarise_stan(draws_stan)
+estimates_opt <- summarise_stan(draws_opt)
 estimates_brms <- summarise_stan(draws_brms, c("b_Intercept", "b_x", "zi"))
 estimates_jags <- summary(draws_jags)[c("a", "b", "p"), c("2.5%", "50%", "97.5%")]
 
@@ -83,6 +92,10 @@ estimates <- true_values |>
     bind_rows(
         estimates_stan |>
             mutate(model = "Stan")
+    ) |>
+    bind_rows(
+        estimates_opt |>
+            mutate(model = "Opt")
     ) |>
     bind_rows(
         estimates_brms |>
@@ -112,7 +125,7 @@ p_estimates <- estimates |>
     mutate(
         model = factor(
             model,
-            levels = c("Actual", "JAGS", "brms", "Stan")
+            levels = c("Actual", "JAGS", "brms", "Stan", "Opt")
         )
     ) |>
     ggplot(aes(y = mid, x = model, ymin = lower, ymax = upper, col = model)) +
