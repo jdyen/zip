@@ -1,0 +1,22 @@
+model {
+
+  # Loop over data rows
+  for (i in 1:n) {
+  
+    # Observed count data
+    y[i] ~ dpois(z[i]*rate[i])
+  
+    # Zeros arising from inflation
+    z[i] ~ dbern(p)
+  
+    # Poisson rate for other observations
+    log(rate[i]) <- a + b*x[i]
+  
+  }
+  
+  # Set up priors	
+  p ~ dunif(0, 1)
+  a ~ dnorm(0, 1.0E-6)
+  b ~ dnorm(0, 1.0E-6)
+  
+ }
